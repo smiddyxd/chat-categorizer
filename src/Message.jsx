@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function Message({ text, isUser }) {
-  const [expanded, setExpanded] = useState(false);
+function Message({ id, text, isUser, searchTerm, forceMaximize }) {
+  const [expanded, setExpanded] = useState(forceMaximize || false);
 
-  // Show only ~3 lines if collapsed
+  // When forceMaximize changes, update the expanded state
+  useEffect(() => {
+    setExpanded(forceMaximize);
+  }, [forceMaximize]);
+
+  const getHighlightedText = (text, highlight) => {
+    if (!highlight) return text;
+    const regex = new RegExp(`(${highlight})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, i) =>
+      part.toLowerCase() === highlight.toLowerCase() ? <mark key={i}>{part}</mark> : part
+    );
+  };
+
   const containerStyle = {
     margin: '10px 0',
     textAlign: isUser ? 'right' : 'left',
@@ -14,38 +27,26 @@ function Message({ text, isUser }) {
     marginLeft: isUser ? 'auto' : '0'
   };
 
-  const previewStyle = {
+  const contentStyle = {
     overflow: 'hidden',
     maxHeight: expanded ? 'none' : '3em',
     whiteSpace: 'pre-wrap'
   };
 
-  // The toggle button sits at the top for demonstration;
-  // you could also place another at the bottom if you like
   const toggleButtonStyle = {
-    display: 'block',
     marginBottom: '5px',
     float: isUser ? 'right' : 'left'
   };
 
   return (
-    <div style={containerStyle}>
-      <button style={toggleButtonStyle} onClick={() => setExpanded(!expanded)}>
+    <div id={id} style={containerStyle}>
+      <button onClick={() => setExpanded(!expanded)} style={toggleButtonStyle}>
         {expanded ? 'Minimize' : 'Maximize'}
       </button>
       <div style={{ clear: 'both' }}></div>
-      <div style={previewStyle}>
-        {text}
+      <div style={contentStyle}>
+        {searchTerm ? getHighlightedText(text, searchTerm) : text}
       </div>
-      {expanded && (
-        <button
-          style={{ float: isUser ? 'right' : 'left', marginTop: '5px' }}
-          onClick={() => setExpanded(false)}
-        >
-          Minimize
-        </button>
-      )}
-      <div style={{ clear: 'both' }}></div>
     </div>
   );
 }

@@ -1,0 +1,29 @@
+/* theme.css */
+
+/* Dark mode default colors */
+:root {
+    --bg-color: #222;
+    --text-color: #eee;
+    --border-color: #444;
+    --button-bg: #333;
+  }
+  
+  /* Apply dark mode globally */
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+  }
+  
+  /* Style buttons for dark mode */
+  button {
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 0.5em 1em;
+  }
+  
+  /* You can style other elements as needed */
+  
