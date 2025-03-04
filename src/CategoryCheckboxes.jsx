@@ -11,10 +11,11 @@ const ALL_CATEGORIES = [
 ];
 
 function CategoryCheckboxes(props) {
-  // If selectedChats prop exists, we're in bulk mode.
+  // If props.selectedChats exists and has length > 0, we're in bulk mode
   if (props.selectedChats && props.selectedChats.length > 0) {
-    // BULK MODE
-    const sharedCategories = props.selectedChats.reduce((acc, c, index) => {
+    const { selectedChats, onBulkCategoryUpdate } = props;
+    // Compute intersection of categories
+    const sharedCategories = selectedChats.reduce((acc, c, index) => {
       const cats = c.categories || [];
       if (index === 0) {
         return new Set(cats);
@@ -28,12 +29,11 @@ function CategoryCheckboxes(props) {
         return newAcc;
       }
     }, new Set());
-    
+
     const handleToggleCategory = (category) => {
       const isShared = sharedCategories.has(category);
-      if (props.onBulkCategoryUpdate) {
-        // Toggle: if shared, remove; if not, add
-        props.onBulkCategoryUpdate(category, !isShared);
+      if (onBulkCategoryUpdate) {
+        onBulkCategoryUpdate(category, !isShared);
       }
     };
 
@@ -55,8 +55,10 @@ function CategoryCheckboxes(props) {
         })}
       </div>
     );
-  } else if (props.chat) {
-    // SINGLE-CHAT MODE
+  }
+
+  // SINGLE-CHAT MODE
+  else if (props.chat) {
     const { chat, onUpdate, categoriesData } = props;
     const chatCategories = chat.categories || [];
     // Combine the chat title and messages for keyword matching
@@ -77,28 +79,35 @@ function CategoryCheckboxes(props) {
     return (
       <div style={{ marginBottom: '10px', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
         <h3>Assign Categories (Single Chat)</h3>
-        {ALL_CATEGORIES.map(cat => (
-          <div key={cat}>
-            <label style={{ display: 'block', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={chatCategories.includes(cat)}
-                onChange={() => handleToggle(cat)}
-              />
-              {cat}
-            </label>
-            {/* Dropdown for keywords in this category */}
-            {categoriesData && categoriesData[cat] && (
-              <details style={{ marginLeft: '20px', marginTop: '5px' }}>
-                <summary style={{ cursor: 'pointer' }}>Keywords</summary>
-                {categoriesData[cat].length === 0 ? (
-                  <div style={{ fontStyle: 'italic', color: '#999', marginLeft: '10px' }}>No keywords</div>
+        {ALL_CATEGORIES.map(cat => {
+          const isChecked = chatCategories.includes(cat);
+          const keywords = categoriesData && categoriesData[cat] ? categoriesData[cat] : [];
+
+          // For each keyword, check if it appears in combinedText
+          return (
+            <details key={cat} style={{ marginBottom: '5px' }}>
+              <summary style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', paddingLeft: "20px"}}>
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => handleToggle(cat)}
+                  style={{ marginRight: '5px' }}
+                />
+                {cat}
+              </summary>
+              {/* The keywords appear when details is expanded */}
+              <div style={{ marginLeft: '20px', marginTop: '5px' }}>
+                {keywords.length === 0 ? (
+                  <div style={{ fontStyle: 'italic', color: '#999' }}>No keywords</div>
                 ) : (
-                  categoriesData[cat].map(keyword => {
+                  keywords.map(keyword => {
                     const kwLower = keyword.toLowerCase();
                     const isPresent = combinedText.includes(kwLower);
                     return (
-                      <label key={keyword} style={{ display: 'block', cursor: 'default', marginLeft: '10px' }}>
+                      <label
+                        key={keyword}
+                        style={{ display: 'block', cursor: 'default', marginLeft: '5px' }}
+                      >
                         <input
                           type="checkbox"
                           checked={isPresent}
@@ -110,10 +119,10 @@ function CategoryCheckboxes(props) {
                     );
                   })
                 )}
-              </details>
-            )}
-          </div>
-        ))}
+              </div>
+            </details>
+          );
+        })}
       </div>
     );
   }

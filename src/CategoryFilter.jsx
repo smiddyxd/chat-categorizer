@@ -227,6 +227,17 @@ function CategoryFilter({
           </div>
         );
       })}
+      <div style={{ marginBottom: '10px' }}>
+        <label style={{ cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={activeFilters.includes("uncategorized")}
+            onChange={() => toggleCategory("uncategorized")}
+            style={{ marginRight: '5px' }}
+          />
+          Uncategorized
+        </label>
+      </div>
     </div>
   );
 }

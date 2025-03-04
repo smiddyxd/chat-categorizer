@@ -41,20 +41,25 @@ function App() {
   }, []);
 
   // Filtering logic
-  const filteredChats = chats.filter(chat => {
-    // 1) Must have all activeFilters in chat.categories
-    const hasAllCategories = activeFilters.every(cat =>
-      chat.categories && chat.categories.includes(cat)
-    );
-    if (!hasAllCategories) return false;
-
-    // 2) If no activeKeywords, no constraint
-    if (activeKeywords.length === 0) return true;
-
-    // 3) Must match at least one active keyword by substring
-    const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
-    return activeKeywords.some(kw => combinedText.includes(kw));
-  });
+const filteredChats = chats.filter(chat => {
+  const otherFilters = activeFilters.filter(f => f !== "uncategorized");
+  const isUncategorizedActive = activeFilters.includes("uncategorized");
+  
+  // Check for uncategorized chats
+  const isChatUncategorized = !chat.categories || chat.categories.length === 0;
+  
+  // Determine if the chat matches the non-uncategorized filters
+  const hasOtherCategories = otherFilters.every(cat =>
+    chat.categories && chat.categories.includes(cat)
+  );
+  
+  // Union logic: show if either uncategorized filter is active and the chat is uncategorized,
+  // OR if there are other filters and the chat meets them.
+  return (isUncategorizedActive && isChatUncategorized) || 
+         (otherFilters.length > 0 && hasOtherCategories) ||
+         // If no category filters at all are active, show the chat.
+         (activeFilters.length === 0);
+});
 
   // Handler to update categories in a single chat
   const updateChatCategories = (chatToUpdate, newCategories) => {
