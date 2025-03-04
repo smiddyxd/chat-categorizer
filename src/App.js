@@ -42,24 +42,32 @@ function App() {
 
   // Filtering logic
 const filteredChats = chats.filter(chat => {
-  const otherFilters = activeFilters.filter(f => f !== "uncategorized");
-  const isUncategorizedActive = activeFilters.includes("uncategorized");
+  const otherFilters = activeFilters.filter(cat => cat !== "uncategorized");
+  const uncategorizedActive = activeFilters.includes("uncategorized");
+  const isUncategorized = !chat.categories || chat.categories.length === 0;
   
-  // Check for uncategorized chats
-  const isChatUncategorized = !chat.categories || chat.categories.length === 0;
+  // Check if the chat qualifies based on categories.
+  let qualifiesForCategory = false;
+  if (uncategorizedActive && isUncategorized) {
+    qualifiesForCategory = true;
+  }
+  if (
+    otherFilters.length > 0 &&
+    chat.categories &&
+    otherFilters.every(cat => chat.categories.includes(cat))
+  ) {
+    qualifiesForCategory = true;
+  }
+  if (activeFilters.length > 0 && !qualifiesForCategory) return false;
   
-  // Determine if the chat matches the non-uncategorized filters
-  const hasOtherCategories = otherFilters.every(cat =>
-    chat.categories && chat.categories.includes(cat)
-  );
-  
-  // Union logic: show if either uncategorized filter is active and the chat is uncategorized,
-  // OR if there are other filters and the chat meets them.
-  return (isUncategorizedActive && isChatUncategorized) || 
-         (otherFilters.length > 0 && hasOtherCategories) ||
-         // If no category filters at all are active, show the chat.
-         (activeFilters.length === 0);
+  // If no activeKeywords, the chat qualifies.
+  if (activeKeywords.length === 0) return true;
+
+  // Check if the chat text or title includes at least one keyword.
+  const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
+  return activeKeywords.some(kw => combinedText.includes(kw));
 });
+
 
   // Handler to update categories in a single chat
   const updateChatCategories = (chatToUpdate, newCategories) => {
