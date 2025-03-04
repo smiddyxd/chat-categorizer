@@ -3,16 +3,18 @@ import Sidebar from './Sidebar';
 import CategoryFilter from './CategoryFilter';
 import CategoryCheckboxes from './CategoryCheckboxes';
 import ChatDisplay from './ChatDisplay';
-import chatsData from './chats.json'; // New structure: { categories: { ... }, chats: [...] }
+import chatsData from './chats.json'; // { categories: { ... }, chats: [...] }
 
 /* global chrome */
 function App() {
   const [chats, setChats] = useState([]);
   const [categories, setCategories] = useState({});
-  const [selectedChat, setSelectedChat] = useState(null);
+  const [displayedChat, setDisplayedChat] = useState(null); // single chat for display
   const [activeFilters, setActiveFilters] = useState([]);
+  const [activeKeywords, setActiveKeywords] = useState([]);
+  const [bulkSelectedChats, setBulkSelectedChats] = useState([]); // array of chat URLs for bulk updates
 
-  // Helper to persist both chats and categories to chrome.storage.local
+  // Persist both chats and categories to chrome.storage
   const saveDataToStorage = (updatedChats, updatedCategories) => {
     chrome.storage.local.set(
       { chats: updatedChats, categories: updatedCategories },
@@ -24,7 +26,7 @@ function App() {
 
   // On mount, load chats and categories from chrome.storage
   useEffect(() => {
-    chrome.storage.local.get(["chats", "categories"], (result) => {
+    chrome.storage.local.get(['chats', 'categories'], (result) => {
       if (result.chats && result.chats.length > 0) {
         setChats(result.chats);
       } else {
@@ -35,7 +37,7 @@ function App() {
       } else {
         setCategories(chatsData.categories);
       }
-      // Save fallback data if nothing is in storage
+      // Save fallback if none in storage
       if (!result.chats || result.chats.length === 0 || !result.categories) {
         chrome.storage.local.set({ chats: chatsData.chats, categories: chatsData.categories });
       }
@@ -44,38 +46,83 @@ function App() {
 
   // Filter logic: only show chats that have all activeFilters in their categories
   const filteredChats = chats.filter(chat => {
-    if (activeFilters.length === 0) return true;
-    return activeFilters.every(cat => chat.categories && chat.categories.includes(cat));
+    // 1) Category filter: must have all activeFilters
+    const hasAllCategories = activeFilters.every(cat =>
+      chat.categories && chat.categories.includes(cat)
+    );
+    if (!hasAllCategories) return false;
+  
+    // 2) Keyword filter: if activeKeywords is empty, no constraint
+    if (activeKeywords.length === 0) return true;
+  
+    // If we have active keywords, chat must match at least one.
+    // We'll do a case-insensitive substring check over the chat’s text.
+    const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
+    // Check if combinedText includes at least one of the activeKeywords
+    return activeKeywords.some(kw => combinedText.includes(kw));
   });
 
-  // Handler to update the categories array of a chat
+  // Single‐chat update handler
   const updateChatCategories = (chatToUpdate, newCategories) => {
-    const updatedChats = chats.map(c => {
-      if (c.title === chatToUpdate.title) {
-        return { ...c, categories: newCategories };
-      }
-      return c;
-    });
+    const updatedChats = chats.map((c) =>
+      c.url === chatToUpdate.url ? { ...c, categories: newCategories } : c
+    );
     setChats(updatedChats);
-    if (selectedChat && selectedChat.url === chatToUpdate.url) {
-      setSelectedChat({ ...selectedChat, categories: newCategories });
+
+    if (displayedChat && displayedChat.url === chatToUpdate.url) {
+      setDisplayedChat({ ...displayedChat, categories: newCategories });
     }
     saveDataToStorage(updatedChats, categories);
   };
 
-  // Handler to update the global categories (for example, when adding, editing, or deleting keywords)
-  const updateGlobalCategories = (newCategories) => {
-    setCategories(newCategories);
-    saveDataToStorage(chats, newCategories);
+  // Bulk update: add or remove a category from all selected chats
+  const handleBulkCategoryUpdate = (category, shouldAdd) => {
+    const updatedChats = chats.map((chat) => {
+      if (bulkSelectedChats.includes(chat.url)) {
+        const catArr = chat.categories || [];
+        if (shouldAdd) {
+          // add if not present
+          if (!catArr.includes(category)) {
+            return { ...chat, categories: [...catArr, category] };
+          }
+        } else {
+          // remove if present
+          if (catArr.includes(category)) {
+            return { ...chat, categories: catArr.filter((c) => c !== category) };
+          }
+        }
+      }
+      return chat;
+    });
+    setChats(updatedChats);
+    saveDataToStorage(updatedChats, categories);
   };
 
-  // Download current data (chats and categories) as a JSON file
+  // Toggle selection for bulk updates
+  const handleToggleChatSelection = (url) => {
+    setBulkSelectedChats((prev) =>
+      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]
+    );
+  };
+
+  // Select / deselect all visible chats
+  const handleSelectAll = (shouldSelect) => {
+    if (shouldSelect) {
+      const allVisible = filteredChats.map((chat) => chat.url);
+      setBulkSelectedChats(allVisible);
+    } else {
+      setBulkSelectedChats([]);
+    }
+  };
+
+  // Derive an array of the actual selected chat objects
+  const multiSelectedChats = chats.filter((c) => bulkSelectedChats.includes(c.url));
+
+  // Download button
   const handleDownload = () => {
-    const data = JSON.stringify({ categories, chats,  }, null, 2);
+    const data = JSON.stringify({ categories, chats }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-
-    // Create a temporary anchor element to trigger download
     const a = document.createElement('a');
     a.href = url;
     a.download = 'chats.json';
@@ -104,26 +151,39 @@ function App() {
       {/* Left side: filters + sidebar */}
       <div style={{ width: '250px', borderRight: '1px solid #ccc', overflowY: 'auto', marginTop: '40px' }}>
         <CategoryFilter
+          categoriesData={categories}   // pass your categories object from JSON
           activeFilters={activeFilters}
           setActiveFilters={setActiveFilters}
-          categoriesData={categories}
+          activeKeywords={activeKeywords}
+          setActiveKeywords={setActiveKeywords}
         />
         <Sidebar
           chats={filteredChats}
-          selectedChat={selectedChat}
-          onSelectChat={setSelectedChat}
+          displayedChat={displayedChat}
+          onSelectChat={setDisplayedChat}
+          bulkSelectedChats={bulkSelectedChats}
+          onToggleChatSelection={handleToggleChatSelection}
+          onSelectAll={handleSelectAll}
         />
       </div>
 
-      {/* Main area: selected chat details */}
+      {/* Main area: displayed chat details */}
       <div style={{ flex: 1, padding: '10px', overflowY: 'auto', marginTop: '40px' }}>
-        {selectedChat ? (
+        {/* If multiple chats are selected, show bulk assignment. Otherwise show single chat assignment. */}
+        {multiSelectedChats.length > 0 ? (
+          // Bulk mode: reflect shared categories and allow toggling them
+          <CategoryCheckboxes
+            selectedChats={multiSelectedChats}
+            onBulkCategoryUpdate={handleBulkCategoryUpdate}
+          />
+        ) : displayedChat ? (
+          // Single-chat mode
           <>
             <CategoryCheckboxes
-              chat={selectedChat}
+              chat={displayedChat}
               onUpdate={updateChatCategories}
             />
-            <ChatDisplay chat={selectedChat} />
+            <ChatDisplay chat={displayedChat} />
           </>
         ) : (
           <div>Select a chat from the sidebar.</div>
