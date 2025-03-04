@@ -7,7 +7,7 @@ function ChatDisplay({ chat }) {
   const [matchIndices, setMatchIndices] = useState([]);
   const [currentMatch, setCurrentMatch] = useState(0);
 
-  // When lockedSearchTerm changes, recalculate match indices based on that term.
+  // When lockedSearchTerm changes, recalc matching indices based on the locked term
   useEffect(() => {
     if (!lockedSearchTerm.trim()) {
       setMatchIndices([]);
@@ -15,7 +15,9 @@ function ChatDisplay({ chat }) {
     } else {
       const lowerSearch = lockedSearchTerm.toLowerCase();
       const indices = chat.chats.reduce((acc, msg, idx) => {
-        if (msg.toLowerCase().includes(lowerSearch)) {
+        // Clean message text before checking
+        const cleanedMsg = msg.replace(/^(you said:|chatgpt said:)\s*/i, '');
+        if (cleanedMsg.toLowerCase().includes(lowerSearch)) {
           acc.push(idx);
         }
         return acc;
@@ -25,7 +27,7 @@ function ChatDisplay({ chat }) {
     }
   }, [lockedSearchTerm, chat.chats]);
 
-  // On Enter, either lock the search term or, if already locked, jump to the next match.
+  // On Enter, either lock the search term or jump to next match
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
       if (lockedSearchTerm !== searchTerm) {
@@ -57,19 +59,18 @@ function ChatDisplay({ chat }) {
         style={{ width: '100%', marginBottom: '10px', padding: '5px' }}
       />
       {chat.chats.map((msg, index) => {
-        const lowerMsg = msg.toLowerCase();
+        // Remove prefixes "You said:" and "ChatGPT said:" at the start (case-insensitive)
+        const cleanedMsg = msg.replace(/^(you said:|chatgpt said:)\s*/i, '');
+        const lowerMsg = cleanedMsg.toLowerCase();
         const lowerLocked = lockedSearchTerm.toLowerCase();
-        // Determine if this message matches the locked search term.
         const hasMatch = lockedSearchTerm.trim() !== "" && lowerMsg.includes(lowerLocked);
         return (
           <Message
             key={index}
             id={`message-${index}`}
-            text={msg}
+            text={cleanedMsg}
             isUser={index % 2 === 0}
-            // Pass the locked search term for highlighting if this message matches
             searchTerm={hasMatch ? lockedSearchTerm : null}
-            // Force maximize messages that match; non-matching messages remain collapsed
             forceMaximize={hasMatch}
           />
         );

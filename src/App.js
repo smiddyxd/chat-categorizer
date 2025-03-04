@@ -217,10 +217,9 @@ function App() {
 
       {/* Right side: main area */}
       <div style={{ flex: 1, padding: '10px', overflowY: 'auto', marginTop: '40px' }}>
-        {multiSelectedChats.length > 0 ? (
-          // Bulk assignment ...
+        {bulkSelectedChats.length > 0 ? (
           <CategoryCheckboxes
-            selectedChats={multiSelectedChats}
+            selectedChats={chats.filter(c => bulkSelectedChats.includes(c.url))}
             onBulkCategoryUpdate={handleBulkCategoryUpdate}
           />
         ) : displayedChat ? (
@@ -228,6 +227,7 @@ function App() {
             <CategoryCheckboxes
               chat={displayedChat}
               onUpdate={updateChatCategories}
+              categoriesData={categories}
             />
             <ChatDisplay chat={displayedChat} />
           </>
