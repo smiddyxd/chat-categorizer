@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
 
-const ALL_CATEGORIES = [
-  "Personal Life / Past",
-  "Coding",
-  "Digital Media",
-  "MBTI",
-  "psychology",
-  "translate",
-  "Transcripts"
-];
-
 function CategoryCheckboxes(props) {
   // If props.selectedChats exists and has length > 0, we're in bulk mode
   if (props.selectedChats && props.selectedChats.length > 0) {
-    const { selectedChats, onBulkCategoryUpdate } = props;
+    
+    const { selectedChats, onBulkCategoryUpdate, categoriesData } = props;
     // Compute intersection of categories
     const sharedCategories = selectedChats.reduce((acc, c, index) => {
       const cats = c.categories || [];
@@ -40,7 +31,7 @@ function CategoryCheckboxes(props) {
     return (
       <div style={{ marginBottom: '10px', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
         <h3>Assign Categories (Bulk)</h3>
-        {ALL_CATEGORIES.map(cat => {
+        {Object.keys(categoriesData).map(cat => {
           const isShared = sharedCategories.has(cat);
           return (
             <label key={cat} style={{ display: 'block', cursor: 'pointer' }}>
@@ -79,7 +70,7 @@ function CategoryCheckboxes(props) {
     return (
       <div style={{ marginBottom: '10px', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
         <h3>Assign Categories (Single Chat)</h3>
-        {ALL_CATEGORIES.map(cat => {
+        {Object.keys(categoriesData).map(cat => {
           const isChecked = chatCategories.includes(cat);
           const keywords = categoriesData && categoriesData[cat] ? categoriesData[cat] : [];
 

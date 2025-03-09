@@ -10,8 +10,9 @@ function App() {
   const [chats, setChats] = useState([]);
   const [categories, setCategories] = useState({});
   const [displayedChat, setDisplayedChat] = useState(null);
-  const [activeFilters, setActiveFilters] = useState([]);
-  const [activeKeywords, setActiveKeywords] = useState([]);
+  // Replace old activeFilters/activeKeywords with objects mapping filter term to its mode booleans.
+  const [activeCategoryFilters, setActiveCategoryFilters] = useState({});
+  const [activeKeywordFilters, setActiveKeywordFilters] = useState({});
   const [bulkSelectedChats, setBulkSelectedChats] = useState([]);
 
   // Persist changes to storage
@@ -40,34 +41,68 @@ function App() {
     });
   }, []);
 
-  // Filtering logic
-const filteredChats = chats.filter(chat => {
-  const otherFilters = activeFilters.filter(cat => cat !== "uncategorized");
-  const uncategorizedActive = activeFilters.includes("uncategorized");
-  const isUncategorized = !chat.categories || chat.categories.length === 0;
-  
-  // Check if the chat qualifies based on categories.
-  let qualifiesForCategory = false;
-  if (uncategorizedActive && isUncategorized) {
-    qualifiesForCategory = true;
-  }
-  if (
-    otherFilters.length > 0 &&
-    chat.categories &&
-    otherFilters.every(cat => chat.categories.includes(cat))
-  ) {
-    qualifiesForCategory = true;
-  }
-  if (activeFilters.length > 0 && !qualifiesForCategory) return false;
-  
-  // If no activeKeywords, the chat qualifies.
-  if (activeKeywords.length === 0) return true;
+  // Helper: Check if a chat passes the category filters.
+  const categoryFilterPass = (chat, filters) => {
+    // First: negatives (both subtractive and conditional)
+    for (const cat in filters) {
+      const f = filters[cat];
+      if (f.subtractiveNegative && chat.categories && chat.categories.includes(cat)) return false;
+      if (f.conditionalNegative && chat.categories && chat.categories.includes(cat)) return false;
+    }
+    // Then: positive filters.
+    let additivePass = false;
+    for (const cat in filters) {
+      const f = filters[cat];
+      if (f.additivePositive && chat.categories && chat.categories.includes(cat)) {
+        additivePass = true;
+      }
+    }
+    // Conditional positive: chat must have all categories flagged as conditional positive.
+    for (const cat in filters) {
+      const f = filters[cat];
+      if (f.conditionalPositive) {
+        if (!chat.categories || !chat.categories.includes(cat)) {
+          return false;
+        }
+      }
+    }
+    // If any additive positive succeeded, include the chat.
+    if (additivePass) return true;
+    // If no positive filters were set, or only conditional positives (which are passed), include chat.
+    return true;
+  };
 
-  // Check if the chat text or title includes at least one keyword.
-  const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
-  return activeKeywords.some(kw => combinedText.includes(kw));
-});
+  // Helper: Check if a chat passes the keyword filters.
+  const keywordFilterPass = (chat, filters) => {
+    const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
+    // Negatives: if any negative filter is active and matches, exclude chat.
+    for (const kw in filters) {
+      const f = filters[kw];
+      if (f.subtractiveNegative && combinedText.includes(kw)) return false;
+      if (f.conditionalNegative && combinedText.includes(kw)) return false;
+    }
+    let additivePass = false;
+    for (const kw in filters) {
+      const f = filters[kw];
+      if (f.additivePositive && combinedText.includes(kw)) {
+        additivePass = true;
+      }
+    }
+    // Conditional positive: if set, chat must include the keyword.
+    for (const kw in filters) {
+      const f = filters[kw];
+      if (f.conditionalPositive && !combinedText.includes(kw)) {
+        return false;
+      }
+    }
+    if (additivePass) return true;
+    return true;
+  };
 
+  const filteredChats = chats.filter(chat => {
+    return categoryFilterPass(chat, activeCategoryFilters) &&
+           keywordFilterPass(chat, activeKeywordFilters);
+  });
 
   // Handler to update categories in a single chat
   const updateChatCategories = (chatToUpdate, newCategories) => {
@@ -116,7 +151,6 @@ const filteredChats = chats.filter(chat => {
 
   // *** KEY PART: Handling add/edit/remove category or keyword
   const handleEditCategories = (action) => {
-    // action: { type: string, category?: string, newCategory?: string, keyword?: string, newKeyword?: string, ... }
     const newCats = { ...categories };
     switch (action.type) {
       case 'ADD_CATEGORY': {
@@ -125,23 +159,27 @@ const filteredChats = chats.filter(chat => {
         break;
       }
       case 'EDIT_CATEGORY': {
-        // rename a category
         const { category, newCategory } = action;
         if (!newCats[category] || newCats[newCategory]) break;
         newCats[newCategory] = newCats[category];
         delete newCats[category];
-        // If we had category in activeFilters, rename that too
-        if (activeFilters.includes(category)) {
-          setActiveFilters(prev => prev.map(c => (c === category ? newCategory : c)));
+        // Update any active filters that refer to the old category
+        if (activeCategoryFilters[category]) {
+          const newFilters = { ...activeCategoryFilters };
+          newFilters[newCategory] = newFilters[category];
+          delete newFilters[category];
+          setActiveCategoryFilters(newFilters);
         }
         break;
       }
       case 'REMOVE_CATEGORY': {
         if (!action.category || !newCats[action.category]) break;
         delete newCats[action.category];
-        // Also remove from activeFilters if present
-        if (activeFilters.includes(action.category)) {
-          setActiveFilters(prev => prev.filter(c => c !== action.category));
+        // Also remove from active filters if present
+        if (activeCategoryFilters[action.category]) {
+          const newFilters = { ...activeCategoryFilters };
+          delete newFilters[action.category];
+          setActiveCategoryFilters(newFilters);
         }
         break;
       }
@@ -158,7 +196,6 @@ const filteredChats = chats.filter(chat => {
         if (!newCats[category]) break;
         const idx = newCats[category].indexOf(keyword);
         if (idx !== -1 && !newCats[category].includes(newKeyword)) {
-          // rename
           newCats[category] = newCats[category].map(kw => (kw === keyword ? newKeyword : kw));
         }
         break;
@@ -167,6 +204,13 @@ const filteredChats = chats.filter(chat => {
         const { category, keyword } = action;
         if (!newCats[category]) break;
         newCats[category] = newCats[category].filter(k => k !== keyword);
+        // Also remove keyword from activeKeywordFilters if present
+        const lower = keyword.toLowerCase();
+        if (activeKeywordFilters[lower]) {
+          const newKeywordFilters = { ...activeKeywordFilters };
+          delete newKeywordFilters[lower];
+          setActiveKeywordFilters(newKeywordFilters);
+        }
         break;
       }
       default:
@@ -209,13 +253,13 @@ const filteredChats = chats.filter(chat => {
       </button>
 
       {/* Left side: category filter + sidebar */}
-      <div style={{ width: '350px', borderRight: '1px solid #ccc', overflowY: 'auto', marginTop: '40px', padding: '10px' }}>
+      <div style={{ width: '450px', borderRight: '1px solid #ccc', overflowY: 'auto', marginTop: '40px', padding: '10px' }}>
         <CategoryFilter
           categoriesData={categories}
-          activeFilters={activeFilters}
-          setActiveFilters={setActiveFilters}
-          activeKeywords={activeKeywords}
-          setActiveKeywords={setActiveKeywords}
+          activeCategoryFilters={activeCategoryFilters}
+          setActiveCategoryFilters={setActiveCategoryFilters}
+          activeKeywordFilters={activeKeywordFilters}
+          setActiveKeywordFilters={setActiveKeywordFilters}
           onEditCategories={handleEditCategories} // new callback
         />
         <Sidebar
@@ -234,6 +278,7 @@ const filteredChats = chats.filter(chat => {
           <CategoryCheckboxes
             selectedChats={chats.filter(c => bulkSelectedChats.includes(c.url))}
             onBulkCategoryUpdate={handleBulkCategoryUpdate}
+            categoriesData={categories}
           />
         ) : displayedChat ? (
           <>

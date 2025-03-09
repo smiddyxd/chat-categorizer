@@ -1,11 +1,19 @@
 import React, { useState } from 'react';
 
+// Colors for the four filter modes
+const colors = {
+  conditionalNegative: 'red',
+  subtractiveNegative: '#DB7093', // purplish-pink
+  conditionalPositive: 'green',
+  additivePositive: 'turquoise'
+};
+
 function CategoryFilter({
   categoriesData,      // e.g. { "Coding": ["bash", "python"], ... }
-  activeFilters,
-  setActiveFilters,
-  activeKeywords,
-  setActiveKeywords,
+  activeCategoryFilters,
+  setActiveCategoryFilters,
+  activeKeywordFilters,
+  setActiveKeywordFilters,
   onEditCategories     // callback to App.js
 }) {
   const [expanded, setExpanded] = useState({});
@@ -24,23 +32,37 @@ function CategoryFilter({
     setExpanded(prev => ({ ...prev, [cat]: !prev[cat] }));
   };
 
-  // Toggle category in activeFilters
-  const toggleCategory = (cat) => {
-    if (activeFilters.includes(cat)) {
-      setActiveFilters(activeFilters.filter(c => c !== cat));
-    } else {
-      setActiveFilters([...activeFilters, cat]);
-    }
+  // Toggle a filter mode for a given category.
+  const toggleCategoryFilter = (cat, mode) => {
+    setActiveCategoryFilters(prev => {
+      const current = prev[cat] || {
+        conditionalNegative: false,
+        subtractiveNegative: false,
+        conditionalPositive: false,
+        additivePositive: false
+      };
+      return {
+        ...prev,
+        [cat]: { ...current, [mode]: !current[mode] }
+      };
+    });
   };
 
-  // Toggle a keyword in activeKeywords
-  const toggleKeyword = (keyword) => {
-    const kwLower = keyword.toLowerCase();
-    if (activeKeywords.includes(kwLower)) {
-      setActiveKeywords(activeKeywords.filter(k => k !== kwLower));
-    } else {
-      setActiveKeywords([...activeKeywords, kwLower]);
-    }
+  // Toggle a filter mode for a given keyword.
+  const toggleKeywordFilter = (keyword, mode) => {
+    const key = keyword.toLowerCase();
+    setActiveKeywordFilters(prev => {
+      const current = prev[key] || {
+        conditionalNegative: false,
+        subtractiveNegative: false,
+        conditionalPositive: false,
+        additivePositive: false
+      };
+      return {
+        ...prev,
+        [key]: { ...current, [mode]: !current[mode] }
+      };
+    });
   };
 
   // CRUD: Add a new category
@@ -99,6 +121,13 @@ function CategoryFilter({
     setTempKeywordName("");
   };
 
+  // A helper style function for checkboxes using the given color
+  const checkboxStyle = (color) => ({
+    marginRight: '2px',
+    accentColor: color,
+    border: `1px solid ${color}`
+  });
+
   return (
     <div style={{ marginBottom: '10px' }}>
       <h3>Filter by Category</h3>
@@ -115,111 +144,187 @@ function CategoryFilter({
       </form>
 
       {Object.keys(categoriesData).map(cat => {
-        const catExpanded = !!expanded[cat];
-        const isCatChecked = activeFilters.includes(cat);
-        const keywords = categoriesData[cat] || [];
-
         const isEditingThisCat = (editingCat === cat);
+        // Get filter state for this category (or default all false)
+        const filterState = activeCategoryFilters[cat] || {
+          conditionalNegative: false,
+          subtractiveNegative: false,
+          conditionalPositive: false,
+          additivePositive: false
+        };
 
         return (
-          <div key={cat} style={{ marginBottom: '5px' }}>
+          <div
+            key={cat}
+            style={{
+              marginBottom: '10px',
+              borderBottom: '1px solid #ddd',
+              paddingBottom: '5px'
+            }}
+          >
             {/* Category row */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => toggleExpand(cat)}
-                style={{
-                  marginRight: '5px',
-                  cursor: 'pointer',
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1rem'
-                }}
-              >
-                {catExpanded ? '▼' : '▶'}
-              </button>
-
-              {isEditingThisCat ? (
-                <>
-                  <input
-                    type="text"
-                    value={tempCatName}
-                    onChange={(e) => setTempCatName(e.target.value)}
-                    style={{ marginRight: '5px' }}
-                  />
-                  <button onClick={() => saveEditedCategory(cat)}>Save</button>
-                  <button onClick={() => { setEditingCat(null); setTempCatName(""); }}>Cancel</button>
-                </>
-              ) : (
-                <>
-                  <label style={{ cursor: 'pointer' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              {/* Left side: expand/collapse + category name (or edit input) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(cat)}
+                  style={{
+                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1rem'
+                  }}
+                >
+                  {expanded[cat] ? '▼' : '▶'}
+                </button>
+                {isEditingThisCat ? (
+                  <>
                     <input
-                      type="checkbox"
-                      checked={isCatChecked}
-                      onChange={() => toggleCategory(cat)}
+                      type="text"
+                      value={tempCatName}
+                      onChange={(e) => setTempCatName(e.target.value)}
                       style={{ marginRight: '5px' }}
                     />
-                    {cat}
-                  </label>
-                  <button onClick={() => startEditingCategory(cat)} style={{ marginLeft: '5px' }}>
-                    Edit
-                  </button>
-                  <button onClick={() => handleRemoveCategory(cat)} style={{ marginLeft: '5px' }}>
-                    Remove
-                  </button>
-                </>
-              )}
+                    <button onClick={() => saveEditedCategory(cat)}>Save</button>
+                    <button onClick={() => { setEditingCat(null); setTempCatName(""); }}>Cancel</button>
+                  </>
+                ) : (
+                  <span>{cat}</span>
+                )}
+              </div>
+
+              {/* Right side: checkboxes + Edit/Remove buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="checkbox"
+                  checked={filterState.conditionalNegative}
+                  onChange={() => toggleCategoryFilter(cat, 'conditionalNegative')}
+                  style={checkboxStyle(colors.conditionalNegative)}
+                />
+                <input
+                  type="checkbox"
+                  checked={filterState.subtractiveNegative}
+                  onChange={() => toggleCategoryFilter(cat, 'subtractiveNegative')}
+                  style={checkboxStyle(colors.subtractiveNegative)}
+                />
+                <input
+                  type="checkbox"
+                  checked={filterState.conditionalPositive}
+                  onChange={() => toggleCategoryFilter(cat, 'conditionalPositive')}
+                  style={checkboxStyle(colors.conditionalPositive)}
+                />
+                <input
+                  type="checkbox"
+                  checked={filterState.additivePositive}
+                  onChange={() => toggleCategoryFilter(cat, 'additivePositive')}
+                  style={checkboxStyle(colors.additivePositive)}
+                />
+
+                {!isEditingThisCat && (
+                  <>
+                    <button onClick={() => startEditingCategory(cat)}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleRemoveCategory(cat)}>
+                      Remove
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* If expanded, show keywords */}
-            {catExpanded && (
+            {/* If expanded, show keywords for this category */}
+            {expanded[cat] && (
               <div style={{ marginLeft: '20px', marginTop: '5px' }}>
-                {keywords.length === 0 && <div style={{ fontStyle: 'italic', color: '#999' }}>No keywords</div>}
-                {keywords.map(keyword => {
+                {(!categoriesData[cat] || categoriesData[cat].length === 0) && (
+                  <div style={{ fontStyle: 'italic', color: '#999' }}>No keywords</div>
+                )}
+                {categoriesData[cat] && categoriesData[cat].map(keyword => {
                   const kwLower = keyword.toLowerCase();
-                  const isKeywordChecked = activeKeywords.includes(kwLower);
-                  const isEditingThisKw = editingKeyword && editingKeyword.cat === cat && editingKeyword.keyword === keyword;
+                  const kwFilterState = activeKeywordFilters[kwLower] || {
+                    conditionalNegative: false,
+                    subtractiveNegative: false,
+                    conditionalPositive: false,
+                    additivePositive: false
+                  };
+                  const isEditingThisKw =
+                    editingKeyword && editingKeyword.cat === cat && editingKeyword.keyword === keyword;
 
                   return (
-                    <div key={keyword} style={{ display: 'flex', alignItems: 'center', marginLeft: '5px' }}>
-                      <label style={{ cursor: 'pointer', flex: 1 }}>
-                        <input
-                          type="checkbox"
-                          checked={isKeywordChecked}
-                          onChange={() => toggleKeyword(keyword)}
-                          style={{ marginRight: '5px' }}
-                        />
-                        {isEditingThisKw ? (
-                          <>
-                            <input
-                              type="text"
-                              value={tempKeywordName}
-                              onChange={(e) => setTempKeywordName(e.target.value)}
-                              style={{ marginRight: '5px' }}
-                            />
-                            <button onClick={() => saveEditedKeyword(cat, keyword)}>Save</button>
-                            <button onClick={() => { setEditingKeyword(null); setTempKeywordName(""); }}>Cancel</button>
-                          </>
-                        ) : (
-                          <>
-                            {keyword}
-                          </>
-                        )}
-                      </label>
-                      {!isEditingThisKw && (
-                        <>
-                          <button onClick={() => startEditingKeyword(cat, keyword)} style={{ marginLeft: '5px' }}>
-                            Edit
-                          </button>
-                          <button onClick={() => handleRemoveKeyword(cat, keyword)} style={{ marginLeft: '5px' }}>
-                            Remove
-                          </button>
-                        </>
-                      )}
+                    <div key={keyword} style={{ marginBottom: '5px' }}>
+                      {/* Keyword row */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        {/* Left side: keyword text (or edit input) */}
+                        <div>
+                          {isEditingThisKw ? (
+                            <>
+                              <input
+                                type="text"
+                                value={tempKeywordName}
+                                onChange={(e) => setTempKeywordName(e.target.value)}
+                                style={{ marginRight: '5px' }}
+                              />
+                              <button onClick={() => saveEditedKeyword(cat, keyword)}>Save</button>
+                              <button onClick={() => { setEditingKeyword(null); setTempKeywordName(""); }}>
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <span>{keyword}</span>
+                          )}
+                        </div>
+
+                        {/* Right side: checkboxes + Edit/Remove */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <input
+                            type="checkbox"
+                            checked={kwFilterState.conditionalNegative}
+                            onChange={() => toggleKeywordFilter(keyword, 'conditionalNegative')}
+                            style={checkboxStyle(colors.conditionalNegative)}
+                          />
+                          <input
+                            type="checkbox"
+                            checked={kwFilterState.subtractiveNegative}
+                            onChange={() => toggleKeywordFilter(keyword, 'subtractiveNegative')}
+                            style={checkboxStyle(colors.subtractiveNegative)}
+                          />
+                          <input
+                            type="checkbox"
+                            checked={kwFilterState.conditionalPositive}
+                            onChange={() => toggleKeywordFilter(keyword, 'conditionalPositive')}
+                            style={checkboxStyle(colors.conditionalPositive)}
+                          />
+                          <input
+                            type="checkbox"
+                            checked={kwFilterState.additivePositive}
+                            onChange={() => toggleKeywordFilter(keyword, 'additivePositive')}
+                            style={checkboxStyle(colors.additivePositive)}
+                          />
+
+                          {!isEditingThisKw && (
+                            <>
+                              <button onClick={() => startEditingKeyword(cat, keyword)}>
+                                Edit
+                              </button>
+                              <button onClick={() => handleRemoveKeyword(cat, keyword)}>
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
-
                 {/* Add a new keyword */}
                 <AddKeywordForm onAdd={(kw) => handleAddKeyword(cat, kw)} />
               </div>
@@ -227,17 +332,6 @@ function CategoryFilter({
           </div>
         );
       })}
-      <div style={{ marginBottom: '10px' }}>
-        <label style={{ cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={activeFilters.includes("uncategorized")}
-            onChange={() => toggleCategory("uncategorized")}
-            style={{ marginRight: '5px' }}
-          />
-          Uncategorized
-        </label>
-      </div>
     </div>
   );
 }
