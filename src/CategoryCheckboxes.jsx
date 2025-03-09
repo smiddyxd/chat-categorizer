@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 
 function CategoryCheckboxes(props) {
+
+    // Local state to track expanded categories
+    const [expanded, setExpanded] = useState({});
+
   // If props.selectedChats exists and has length > 0, we're in bulk mode
   if (props.selectedChats && props.selectedChats.length > 0) {
-    
     const { selectedChats, onBulkCategoryUpdate, categoriesData } = props;
     // Compute intersection of categories
     const sharedCategories = selectedChats.reduce((acc, c, index) => {
@@ -47,13 +50,18 @@ function CategoryCheckboxes(props) {
       </div>
     );
   }
-
+  // ------------------------------
   // SINGLE-CHAT MODE
+  // ------------------------------
   else if (props.chat) {
     const { chat, onUpdate, categoriesData } = props;
     const chatCategories = chat.categories || [];
     // Combine the chat title and messages for keyword matching
     const combinedText = ((chat.title || "") + " " + (chat.chats || []).join(" ")).toLowerCase();
+
+    const toggleExpand = (cat) => {
+      setExpanded(prev => ({ ...prev, [cat]: !prev[cat] }));
+    };
 
     const handleToggle = (cat) => {
       let updatedCategories;
@@ -72,46 +80,72 @@ function CategoryCheckboxes(props) {
         <h3>Assign Categories (Single Chat)</h3>
         {Object.keys(categoriesData).map(cat => {
           const isChecked = chatCategories.includes(cat);
-          const keywords = categoriesData && categoriesData[cat] ? categoriesData[cat] : [];
+          const keywords = categoriesData[cat] || [];
 
-          // For each keyword, check if it appears in combinedText
           return (
-            <details key={cat} style={{ marginBottom: '5px' }}>
-              <summary style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', paddingLeft: "20px"}}>
+            <div key={cat}>
+              {/* Category row with arrow + checkbox */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none'
+                }}
+              >
+                {/* Arrow: expand/collapse */}
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(cat)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1rem'
+                  }}
+                >
+                  {expanded[cat] ? '▼' : '▶'}
+                </button>
+
+                {/* Category checkbox */}
                 <input
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => handleToggle(cat)}
                   style={{ marginRight: '5px' }}
                 />
-                {cat}
-              </summary>
-              {/* The keywords appear when details is expanded */}
-              <div style={{ marginLeft: '20px', marginTop: '5px' }}>
-                {keywords.length === 0 ? (
-                  <div style={{ fontStyle: 'italic', color: '#999' }}>No keywords</div>
-                ) : (
-                  keywords.map(keyword => {
-                    const kwLower = keyword.toLowerCase();
-                    const isPresent = combinedText.includes(kwLower);
-                    return (
-                      <label
-                        key={keyword}
-                        style={{ display: 'block', cursor: 'default', marginLeft: '5px' }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isPresent}
-                          readOnly
-                          style={{ marginRight: '5px' }}
-                        />
-                        {keyword}
-                      </label>
-                    );
-                  })
-                )}
+                <span onClick={() => toggleExpand(cat)}>
+                  {cat}
+                </span>
               </div>
-            </details>
+
+              {/* Keyword list, shown only if expanded */}
+              {expanded[cat] && (
+                <div style={{ marginLeft: '20px', marginTop: '5px' }}>
+                  {keywords.length === 0 ? (
+                    <div style={{ fontStyle: 'italic', color: '#999' }}>No keywords</div>
+                  ) : (
+                    keywords.map(keyword => {
+                      const kwLower = keyword.toLowerCase();
+                      const isPresent = combinedText.includes(kwLower);
+                      return (
+                        <label
+                          key={keyword}
+                          style={{ display: 'block', cursor: 'default', marginLeft: '5px' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isPresent}
+                            readOnly
+                            style={{ marginRight: '5px' }}
+                          />
+                          {keyword}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
